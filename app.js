@@ -20,8 +20,8 @@ function loadSession() {
 // =========================
 function cfHeaders(cfId, cfKey) {
   return {
-    'CF-Client-Id': cfId,
-    'CF-Client-Key': cfKey
+    'CF-Access-Client-Id': cfId,
+    'CF-Access-Client-Secret': cfKey
   };
 }
 
