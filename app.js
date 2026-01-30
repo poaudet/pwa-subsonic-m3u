@@ -1,65 +1,61 @@
 // =========================
 // Session storage helpers
 // =========================
-
-function saveSession(serverUrl, token) {
+function saveSession(serverUrl, cfId, cfKey) {
   sessionStorage.setItem('serverUrl', serverUrl);
-  sessionStorage.setItem('token', token);
+  sessionStorage.setItem('cfId', cfId);
+  sessionStorage.setItem('cfKey', cfKey);
 }
 
 function loadSession() {
   return {
     serverUrl: sessionStorage.getItem('serverUrl'),
-    token: sessionStorage.getItem('token')
+    cfId: sessionStorage.getItem('cfId'),
+    cfKey: sessionStorage.getItem('cfKey')
   };
 }
 
 // =========================
-// Auth header
+// Cloudflare headers
 // =========================
-
-function authHeaders(token) {
+function cfHeaders(cfId, cfKey) {
   return {
-    'Authorization': `Bearer ${token}`
+    'CF-Client-Id': cfId,
+    'CF-Client-Key': cfKey
   };
 }
 
 // =========================
-// API calls
+// API calls to /rest/
+// Nginx will inject Subsonic u/p and f=json
 // =========================
-
-async function getPlaylists(serverUrl, token) {
-  const url = `${serverUrl}/rest/getPlaylists.view?f=json`;
-
+async function getPlaylists(serverUrl, cfId, cfKey) {
+  const url = `${serverUrl}/rest/getPlaylists.view`;
   const res = await fetch(url, {
-    headers: authHeaders(token)
+    headers: cfHeaders(cfId, cfKey)
   });
 
-  if (!res.ok) throw new Error('Playlist fetch failed');
-
+  if (!res.ok) throw new Error('Failed to fetch playlists');
   const json = await res.json();
   return json['subsonic-response'].playlists.playlist || [];
 }
 
-async function getPlaylist(serverUrl, token, playlistId) {
-  const url = `${serverUrl}/rest/getPlaylist.view?id=${playlistId}&f=json`;
-
+async function getPlaylist(serverUrl, cfId, cfKey, playlistId) {
+  const url = `${serverUrl}/rest/getPlaylist.view?id=${playlistId}`;
   const res = await fetch(url, {
-    headers: authHeaders(token)
+    headers: cfHeaders(cfId, cfKey)
   });
 
-  if (!res.ok) throw new Error('Playlist detail fetch failed');
-
+  if (!res.ok) throw new Error('Failed to fetch playlist details');
   const json = await res.json();
   return json['subsonic-response'].playlist.entry || [];
 }
 
 // =========================
-// Path rewrite (OPTION B)
+// Path rewrite (Option B)
 // =========================
-
 function rewritePath(path) {
-  // Adjust this to match your proxy mapping
+  // Adjust to match your proxy mapping
   return path
     .replace(/^\/music\//, '/mnt/media/')
     .replace(/\\/g, '/');
@@ -70,9 +66,8 @@ function buildFileUrl(serverUrl, path) {
 }
 
 // =========================
-// M3U generation
+// Generate M3U
 // =========================
-
 function generateM3U(name, tracks, serverUrl) {
   const lines = ['#EXTM3U'];
 
@@ -89,9 +84,8 @@ function generateM3U(name, tracks, serverUrl) {
 }
 
 // =========================
-// Download
+// Download M3U
 // =========================
-
 function downloadM3U(name, content) {
   const blob = new Blob([content], { type: 'audio/x-mpegurl' });
   const url = URL.createObjectURL(blob);
@@ -107,31 +101,34 @@ function downloadM3U(name, content) {
 // =========================
 // UI wiring
 // =========================
-
 const serverInput = document.getElementById('serverUrl');
-const tokenInput = document.getElementById('token');
+const cfIdInput = document.getElementById('cfId');
+const cfKeyInput = document.getElementById('cfKey');
 const connectBtn = document.getElementById('connect');
 const list = document.getElementById('playlists');
 
 // Restore session if available
 const session = loadSession();
 if (session.serverUrl) serverInput.value = session.serverUrl;
-if (session.token) tokenInput.value = session.token;
+if (session.cfId) cfIdInput.value = session.cfId;
+if (session.cfKey) cfKeyInput.value = session.cfKey;
 
 connectBtn.onclick = async () => {
   const serverUrl = serverInput.value.trim();
-  const token = tokenInput.value.trim();
+  const cfId = cfIdInput.value.trim();
+  const cfKey = cfKeyInput.value.trim();
 
-  if (!serverUrl || !token) {
-    alert('Missing server URL or token');
+  if (!serverUrl || !cfId || !cfKey) {
+    alert('Server URL, CF-Client-Id, and CF-Client-Key are required');
     return;
   }
 
-  saveSession(serverUrl, token);
+  saveSession(serverUrl, cfId, cfKey);
+
   list.innerHTML = 'Loading…';
 
   try {
-    const playlists = await getPlaylists(serverUrl, token);
+    const playlists = await getPlaylists(serverUrl, cfId, cfKey);
     list.innerHTML = '';
 
     playlists.forEach(pl => {
@@ -141,7 +138,7 @@ connectBtn.onclick = async () => {
       li.onclick = async () => {
         li.textContent = `Generating ${pl.name}…`;
 
-        const tracks = await getPlaylist(serverUrl, token, pl.id);
+        const tracks = await getPlaylist(serverUrl, cfId, cfKey, pl.id);
         const m3u = generateM3U(pl.name, tracks, serverUrl);
         downloadM3U(pl.name, m3u);
 
@@ -150,7 +147,6 @@ connectBtn.onclick = async () => {
 
       list.appendChild(li);
     });
-
   } catch (err) {
     alert(err.message);
     list.innerHTML = '';
@@ -158,9 +154,8 @@ connectBtn.onclick = async () => {
 };
 
 // =========================
-// Service worker
+// Service worker registration
 // =========================
-
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js');
 }
