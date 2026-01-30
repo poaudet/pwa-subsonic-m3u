@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <title>Subsonic M3U Generator</title>
+
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+
+  <meta name="theme-color" content="#121212" />
+</head>
+<body>
+
+  <h1>🎵 Subsonic M3U Generator</h1>
+
+  <!-- Connection -->
+  <section>
+    <label>
+      Server URL
+      <input id="serverUrl" placeholder="https://music.example.com" />
+    </label>
+
+    <label>
+      Bearer Token
+      <input id="token" type="password" placeholder="••••••••" />
+    </label>
+
+    <button id="connect">Fetch playlists</button>
+  </section>
+
+  <!-- Playlist list -->
+  <section>
+    <ul id="playlists"></ul>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>
