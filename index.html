@@ -15,7 +15,7 @@
 
   <h1>🎵 Subsonic M3U Generator</h1>
 
-  <!-- Connection -->
+  <!-- Cloudflare credentials input -->
   <section>
     <label>
       Server URL
@@ -23,8 +23,13 @@
     </label>
 
     <label>
-      Bearer Token
-      <input id="token" type="password" placeholder="••••••••" />
+      CF-Client-Id
+      <input id="cfId" type="text" placeholder="Cloudflare Client ID" />
+    </label>
+
+    <label>
+      CF-Client-Key
+      <input id="cfKey" type="password" placeholder="Cloudflare Client Key" />
     </label>
 
     <button id="connect">Fetch playlists</button>
