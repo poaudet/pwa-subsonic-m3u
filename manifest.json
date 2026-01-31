@@ -1,7 +1,8 @@
 {
   "name": "M3U Exporter for Shanglin M1PLUS",
   "short_name": "M3U Exporter",
-  "start_url": "https://poaudet.github.io/pwa-subsonic-m3u/",
+  "start_url": "/pwa-subsonic-m3u/",
+  "scope": "/pwa-subsonic-m3u/",
   "display": "standalone",
   "background_color": "#121212",
   "theme_color": "#121212",
