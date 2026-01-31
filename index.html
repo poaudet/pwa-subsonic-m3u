@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-  <title>Subsonic M3U Generator</title>
+  <title>Subsonic → DAP M3U Exporter</title>
 
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css" />
@@ -13,23 +13,41 @@
 </head>
 <body>
 
-  <h1>🎵 Subsonic M3U Generator</h1>
+  <h1>🎵 Subsonic → DAP M3U Exporter</h1>
 
-  <!-- Cloudflare credentials input -->
+  <!-- Configuration -->
   <section>
     <label>
-      Server URL
-      <input id="serverUrl" placeholder="https://music.example.com" />
+      Subsonic / Navidrome URL
+      <input
+        id="serverUrl"
+        placeholder="https://music.example.com"
+      />
     </label>
 
     <label>
-      CF-Client-Id
-      <input id="cfId" type="text" placeholder="Cloudflare Client ID" />
+      Datasette Base URL
+      <input
+        id="dataUrl"
+        placeholder="https://data.example.com"
+      />
     </label>
 
     <label>
-      CF-Client-Key
-      <input id="cfKey" type="password" placeholder="Cloudflare Client Key" />
+      Database name
+      <input
+        id="db"
+        placeholder="navidrome"
+        value="navidrome"
+      />
+    </label>
+
+    <label>
+      Custom query (optional)
+      <input
+        id="query"
+        placeholder="navidrome.json?sql=select+full_path+from+playlist_export+where+id+%3D+"
+      />
     </label>
 
     <button id="connect">Fetch playlists</button>
