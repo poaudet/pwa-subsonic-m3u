@@ -102,12 +102,7 @@ async function uploadToDAP(dapUrl, name, content) {
 const serverInput = document.getElementById('serverUrl');
 const dataInput = document.getElementById('dataUrl');
 const dbInput = document.getElementById('db');
-const db = dbInput && dbInput.value.trim() !== ""
-  ? dbInput.value.trim()
-  : "navidrome";
-
 const queryEl = document.getElementById('query');
-
 const dapInput = document.getElementById('dapUrl');
 const connectBtn = document.getElementById('connect');
 const list = document.getElementById('playlists');
@@ -122,8 +117,8 @@ if (session.dapUrl) dapInput.value = session.dapUrl;
 connectBtn.onclick = async () => {
   const serverUrl = serverInput.value.trim();
   const dataUrl = dataInput.value.trim();
-  const db = dbInput.value.trim();
-  const dapUrl = dabInput.value.trim();
+  const db = dbInput.value.trim() || "navidrome";
+  const dapUrl = dapInput.value.trim();
 
   if (!serverUrl || !dataUrl || !db) {
     alert('Server URL, Database URL and Database are required');
