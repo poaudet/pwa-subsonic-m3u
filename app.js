@@ -1,27 +1,17 @@
 // =========================
 // Session storage helpers
 // =========================
-function saveSession(serverUrl, cfId, cfKey) {
+function saveSession(serverUrl, dataUrl, db) {
   sessionStorage.setItem('serverUrl', serverUrl);
-  sessionStorage.setItem('cfId', cfId);
-  sessionStorage.setItem('cfKey', cfKey);
+  sessionStorage.setItem('dataUrl', dataUrl);
+  sessionStorage.setItem('db', db);
 }
 
 function loadSession() {
   return {
     serverUrl: sessionStorage.getItem('serverUrl'),
-    cfId: sessionStorage.getItem('cfId'),
-    cfKey: sessionStorage.getItem('cfKey')
-  };
-}
-
-// =========================
-// Cloudflare headers
-// =========================
-function cfHeaders(cfId, cfKey) {
-  return {
-    'CF-Access-Client-Id': cfId,
-    'CF-Access-Client-Secret': cfKey
+    dataUrl: sessionStorage.getItem('dataUrl'),
+    db: sessionStorage.getItem('db')                                
   };
 }
 
@@ -29,54 +19,33 @@ function cfHeaders(cfId, cfKey) {
 // API calls to /rest/
 // Nginx will inject Subsonic u/p and f=json
 // =========================
-async function getPlaylists(serverUrl, cfId, cfKey) {
+async function getPlaylists(serverUrl) {
   const url = `${serverUrl}/rest/getPlaylists.view`;
-  const res = await fetch(url, {
-    headers: cfHeaders(cfId, cfKey)
-  });
+  const res = await fetch(url);
 
   if (!res.ok) throw new Error('Failed to fetch playlists');
   const json = await res.json();
-  return json['subsonic-response'].playlists.playlist || [];
+  return json?.['subsonic-response']?.playlists.playlist || [];
 }
 
-async function getPlaylist(serverUrl, cfId, cfKey, playlistId) {
-  const url = `${serverUrl}/rest/getPlaylist.view?id=${playlistId}`;
-  const res = await fetch(url, {
-    headers: cfHeaders(cfId, cfKey)
-  });
+async function getPlaylist(dataUrl, query, pid) {
+  const url = `${dataUrl}/${query}${encodeURIComponent(pid)}`;
+  const res = await fetch(url);
 
   if (!res.ok) throw new Error('Failed to fetch playlist details');
   const json = await res.json();
-  return json['subsonic-response'].playlist.entry || [];
-}
-
-// =========================
-// Path rewrite (Option B)
-// =========================
-function rewritePath(path) {
-  // Adjust to match your proxy mapping
-  return path
-    .replace(/^\/music\//, '/mnt/media/')
-    .replace(/\\/g, '/');
-}
-
-function buildFileUrl(serverUrl, path) {
-  return `${serverUrl}${rewritePath(path)}`;
+  return (json.rows || []).map(r => r[0]);
 }
 
 // =========================
 // Generate M3U
 // =========================
-function generateM3U(name, tracks, serverUrl) {
+function generateM3U(name, tracks) {
   const lines = ['#EXTM3U'];
 
   tracks.forEach(track => {
     lines.push(
-      `#EXTINF:${track.duration || -1},${track.artist} - ${track.title}`
-    );
-    lines.push(
-      buildFileUrl(serverUrl, track.path)
+      track
     );
   });
 
@@ -102,33 +71,37 @@ function downloadM3U(name, content) {
 // UI wiring
 // =========================
 const serverInput = document.getElementById('serverUrl');
-const cfIdInput = document.getElementById('cfId');
-const cfKeyInput = document.getElementById('cfKey');
+const dataInput = document.getElementById('dataUrl');
+const dbInput = document.getElementById('db');
+const queryEl = document.getElementById('query');
+const query = queryEl && queryEl.value.trim() !== ""
+  ? queryEl.value.trim()
+  : "navidrome.json?sql=select+full_path+from+playlist_export+where+id+%3D+";
 const connectBtn = document.getElementById('connect');
 const list = document.getElementById('playlists');
 
 // Restore session if available
 const session = loadSession();
 if (session.serverUrl) serverInput.value = session.serverUrl;
-if (session.cfId) cfIdInput.value = session.cfId;
-if (session.cfKey) cfKeyInput.value = session.cfKey;
+if (session.dataUrl) dataInput.value = session.dataUrl;
+if (session.db) dbInput.value = session.db;
 
 connectBtn.onclick = async () => {
   const serverUrl = serverInput.value.trim();
-  const cfId = cfIdInput.value.trim();
-  const cfKey = cfKeyInput.value.trim();
+  const dataUrl = dataInput.value.trim();
+  const db = dbInput.value.trim();
 
-  if (!serverUrl || !cfId || !cfKey) {
-    alert('Server URL, CF-Client-Id, and CF-Client-Key are required');
+  if (!serverUrl || !dataUrl || !db) {
+    alert('Server URL, Database URL and Database are required');
     return;
   }
 
-  saveSession(serverUrl, cfId, cfKey);
+  saveSession(serverUrl, dataUrl, db);
 
   list.innerHTML = 'Loading…';
 
   try {
-    const playlists = await getPlaylists(serverUrl, cfId, cfKey);
+    const playlists = await getPlaylists(serverUrl);
     list.innerHTML = '';
 
     playlists.forEach(pl => {
@@ -136,15 +109,18 @@ connectBtn.onclick = async () => {
       li.textContent = pl.name;
 
       li.onclick = async () => {
-        li.textContent = `Generating ${pl.name}…`;
-
-        const tracks = await getPlaylist(serverUrl, cfId, cfKey, pl.id);
-        const m3u = generateM3U(pl.name, tracks, serverUrl);
-        downloadM3U(pl.name, m3u);
-
-        li.textContent = pl.name;
+        try {
+          li.textContent = `Generating ${pl.name}…`;
+          const tracks = await getPlaylist(dataUrl, query, pl.id);
+          const m3u = generateM3U(pl.name, tracks);
+          downloadM3U(pl.name, m3u);
+        } catch (e) {
+          alert(`Failed: ${pl.name}`);
+        } finally {
+          li.textContent = pl.name;
+        }
       };
-
+      
       list.appendChild(li);
     });
   } catch (err) {
