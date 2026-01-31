@@ -102,10 +102,12 @@ async function uploadToDAP(dapUrl, name, content) {
 const serverInput = document.getElementById('serverUrl');
 const dataInput = document.getElementById('dataUrl');
 const dbInput = document.getElementById('db');
+const db = dbInput && dbInput.value.trim() !== ""
+  ? dbInput.value.trim()
+  : "navidrome";
+
 const queryEl = document.getElementById('query');
-const query = queryEl && queryEl.value.trim() !== ""
-  ? queryEl.value.trim()
-  : "navidrome.json?sql=select+full_path+from+playlist_export+where+id+%3D+";
+
 const dapInput = document.getElementById('dapUrl');
 const connectBtn = document.getElementById('connect');
 const list = document.getElementById('playlists');
@@ -115,12 +117,13 @@ const session = loadSession();
 if (session.serverUrl) serverInput.value = session.serverUrl;
 if (session.dataUrl) dataInput.value = session.dataUrl;
 if (session.db) dbInput.value = session.db;
-if (session.dapUrl) dapUrl.value = session.dapUrl;
+if (session.dapUrl) dapInput.value = session.dapUrl;
 
 connectBtn.onclick = async () => {
   const serverUrl = serverInput.value.trim();
   const dataUrl = dataInput.value.trim();
   const db = dbInput.value.trim();
+  const dapUrl = dabInput.value.trim();
 
   if (!serverUrl || !dataUrl || !db) {
     alert('Server URL, Database URL and Database are required');
@@ -143,11 +146,14 @@ connectBtn.onclick = async () => {
         try {
           li.textContent = `Generating ${pl.name}…`;
           const dapUrl = dapInput.value.trim();
+          const query = queryEl && queryEl.value.trim() !== ""
+            ? queryEl.value.trim()
+            : `${db}.json?sql=select+full_path+from+playlist_export+where+id+%3D+`;
           const tracks = await getPlaylist(dataUrl, query, pl.id);
           const m3u = generateM3U(pl.name, tracks);
-          await downloadM3U(pl.name, m3u);
+          await exportM3U(pl.name, m3u, dapUrl);
         } catch (e) {
-          alert(`Failed: ${pl.name}`);
+          alert(`Failed: ${pl.name}\n${e.message}`);
         } finally {
           li.textContent = pl.name;
         }
