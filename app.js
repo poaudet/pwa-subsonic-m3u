@@ -29,7 +29,7 @@ async function getPlaylists(serverUrl) {
 }
 
 async function getPlaylist(dataUrl, query, pid) {
-  const url = `${dataUrl}/${query}${encodeURIComponent(pid)}`;
+  const url = `${dataUrl}/${query}"${encodeURIComponent(pid)}"`;
   const res = await fetch(url);
 
   if (!res.ok) throw new Error('Failed to fetch playlist details');
