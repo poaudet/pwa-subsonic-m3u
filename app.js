@@ -98,8 +98,8 @@ async function uploadToDAP(dapUrl, name, content) {
     mode: 'cors'
   });
 
-  if (!res.ok) {
-    throw new Error(`DAP upload failed: ${res.status}`);
+  if (res.type === 'opaque' || res.status !== 200) {
+    throw new Error(`DAP upload failed`);
   }
 }
 
