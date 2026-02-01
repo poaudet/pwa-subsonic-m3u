@@ -92,21 +92,19 @@ async function uploadToDAP(dapUrl, name, content) {
     `${name}.m3u`
   );
 
-  const res = await fetch(dapUrl, {
-    method: 'POST',
-    body: form,
-    mode: 'cors'
-  });
+  let res;
+  try {
+    res = await fetch(dapUrl, {
+      method: 'POST',
+      body: form,
+      mode: 'cors'
+    });
+  } catch (err) {
+    throw new Error('DAP upload blocked by browser');
+  }
 
-  console.log(
-    'type=', res.type,
-    'status=', res.status,
-    'ok=', res.ok,
-    'redirected=', res.redirected
-  );  
-
-  if (res.type === 'opaque' || res.status !== 200) {
-    throw new Error(`DAP upload failed`);
+  if (res.status !== 200) {
+    throw new Error(`DAP upload failed: ${res.status}`);
   }
 }
 
