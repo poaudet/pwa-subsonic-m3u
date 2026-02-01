@@ -59,8 +59,13 @@ function generateM3U(name, tracks) {
 // =========================
 async function exportM3U(name, content, dapUrl) {
   if (dapUrl) {
-    await uploadToDAP(dapUrl, name, content);
-    return;
+    try {
+      await uploadToDAP(dapUrl, name, content);
+      return; // success → stop here
+    } catch (err) {
+      console.warn('DAP upload failed, falling back to browser download:', err);
+      // fall through to browser download
+    }
   }
 
   // fallback: normal browser download
@@ -70,7 +75,9 @@ async function exportM3U(name, content, dapUrl) {
   const a = document.createElement('a');
   a.href = url;
   a.download = `${name}.m3u`;
+  document.body.appendChild(a);
   a.click();
+  document.body.removeChild(a);
 
   URL.revokeObjectURL(url);
 }
@@ -92,7 +99,7 @@ async function uploadToDAP(dapUrl, name, content) {
   });
 
   if (!res.ok) {
-    throw new Error('Failed to upload playlist to DAP');
+    throw new Error(`DAP upload failed: ${res.status}`);
   }
 }
 
