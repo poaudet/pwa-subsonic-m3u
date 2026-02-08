@@ -1,19 +1,21 @@
 // =========================
-// Session storage helpers
+// Local storage helpers
 // =========================
-function saveSession(serverUrl, dataUrl, db, dapUrl) {
-  sessionStorage.setItem('serverUrl', serverUrl);
-  sessionStorage.setItem('dataUrl', dataUrl);
-  sessionStorage.setItem('db', db);
-  sessionStorage.setItem('dapUrl', dapUrl);
+function saveLocal(serverUrl, dataUrl, db, dapUrl) {
+  // Store each value under a distinct key in localStorage
+  localStorage.setItem('serverUrl', serverUrl);
+  localStorage.setItem('dataUrl', dataUrl);
+  localStorage.setItem('db', db);
+  localStorage.setItem('dapUrl', dapUrl);
 }
 
-function loadSession() {
+function loadLocal() {
+  // Retrieve the stored values; missing keys resolve to null
   return {
-    serverUrl: sessionStorage.getItem('serverUrl'),
-    dataUrl: sessionStorage.getItem('dataUrl'),
-    db: sessionStorage.getItem('db'),
-    dapUrl: sessionStorage.getItem('dapUrl')  
+    serverUrl: localStorage.getItem('serverUrl'),
+    dataUrl:   localStorage.getItem('dataUrl'),
+    db:        localStorage.getItem('db'),
+    dapUrl:    localStorage.getItem('dapUrl')
   };
 }
 
@@ -44,13 +46,7 @@ async function getPlaylist(dataUrl, query, pid) {
 // =========================
 function generateM3U(name, tracks) {
   const lines = ['#EXTM3U'];
-
-  tracks.forEach(track => {
-    lines.push(
-      track
-    );
-  });
-
+  tracks.forEach(track => lines.push(track));
   return lines.join('\n');
 }
 
@@ -112,32 +108,33 @@ async function uploadToDAP(dapUrl, name, content) {
 // UI wiring
 // =========================
 const serverInput = document.getElementById('serverUrl');
-const dataInput = document.getElementById('dataUrl');
-const dbInput = document.getElementById('db');
-const queryEl = document.getElementById('query');
-const dapInput = document.getElementById('dapUrl');
-const connectBtn = document.getElementById('connect');
-const list = document.getElementById('playlists');
+const dataInput   = document.getElementById('dataUrl');
+const dbInput     = document.getElementById('db');
+const queryEl     = document.getElementById('query');
+const dapInput    = document.getElementById('dapUrl');
+const connectBtn  = document.getElementById('connect');
+const list        = document.getElementById('playlists');
 
-// Restore session if available
-const session = loadSession();
-if (session.serverUrl) serverInput.value = session.serverUrl;
-if (session.dataUrl) dataInput.value = session.dataUrl;
-if (session.db) dbInput.value = session.db;
-if (session.dapUrl) dapInput.value = session.dapUrl;
+// Restore persisted values (now from localStorage)
+const persisted = loadLocal();
+if (persisted.serverUrl) serverInput.value = persisted.serverUrl;
+if (persisted.dataUrl)   dataInput.value   = persisted.dataUrl;
+if (persisted.db)        dbInput.value     = persisted.db;
+if (persisted.dapUrl)    dapInput.value    = persisted.dapUrl;
 
 connectBtn.onclick = async () => {
   const serverUrl = serverInput.value.trim();
-  const dataUrl = dataInput.value.trim();
-  const db = dbInput.value.trim() || "navidrome";
-  const dapUrl = dapInput.value.trim();
+  const dataUrl   = dataInput.value.trim();
+  const db        = dbInput.value.trim() || "navidrome";
+  const dapUrl    = dapInput.value.trim();
 
   if (!serverUrl || !dataUrl || !db) {
     alert('Server URL, Database URL and Database are required');
     return;
   }
 
-  saveSession(serverUrl, dataUrl, db, dapUrl);
+  // Persist the current session for future page loads
+  saveLocal(serverUrl, dataUrl, db, dapUrl);
 
   list.innerHTML = 'Loading…';
 
@@ -165,7 +162,7 @@ connectBtn.onclick = async () => {
           li.textContent = pl.name;
         }
       };
-      
+
       list.appendChild(li);
     });
   } catch (err) {
