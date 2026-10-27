@@ -80,7 +80,7 @@ function cfHeaders(id, secret) {
     : {};
 }
 
-async function getPlaylists(serverUrl, user, pass) {
+async function getPlaylists(serverUrl, user, pass, cf = {}) {
   const base = serverUrl.replace(/\/+$/, '');
   const url = `${base}/rest/getPlaylists.view?${authParams(user, pass)}`;
   const res = await safeFetch(url, { headers: cf }, 'Subsonic server');
@@ -101,7 +101,7 @@ async function getPlaylists(serverUrl, user, pass) {
 // =========================
 // Datasette: track paths for a playlist
 // =========================
-async function getPlaylist(dataUrl, query, pid) {
+async function getPlaylist(dataUrl, query, pid, cf = {}) {
   const base = dataUrl.replace(/\/+$/, '');
   const url = `${base}/${query}"${encodeURIComponent(pid)}"`;
   const res = await safeFetch(url, { headers: cf }, 'Datasette');
@@ -182,6 +182,12 @@ const passInput     = document.getElementById('pass');
 const rememberInput = document.getElementById('remember');
 const connectBtn    = document.getElementById('connect');
 const list          = document.getElementById('playlists');
+const cfIdInput     = document.getElementById('cfId');
+const cfSecretInput = document.getElementById('cfSecret');
+
+// restore
+if (persisted.cfId)     cfIdInput.value     = persisted.cfId;
+if (persisted.cfSecret) cfSecretInput.value = persisted.cfSecret;
 
 // Restore persisted values
 const persisted = loadLocal();
@@ -201,18 +207,21 @@ connectBtn.onclick = async () => {
   const user      = userInput.value.trim();
   const pass      = passInput.value; // don't trim passwords
   const remember  = rememberInput.checked;
+  const cfId      = cfIdInput.value.trim();
+  const cfSecret  = cfSecretInput.value.trim();
+  const cf        = cfHeaders(cfId, cfSecret);
+
+  saveLocal({ serverUrl, dataUrl, db, dapUrl, user, pass, cfId, cfSecret, remember });
 
   if (!serverUrl || !dataUrl || !db || !user || !pass) {
     alert('Server URL, Datasette URL, Database, Username and Password are required');
     return;
   }
 
-  saveLocal({ serverUrl, dataUrl, db, dapUrl, user, pass, remember });
-
   list.innerHTML = 'Loading…';
 
   try {
-    const playlists = await getPlaylists(serverUrl, user, pass);
+    const playlists = await getPlaylists(serverUrl, user, pass, cf);
     list.innerHTML = '';
 
     playlists.forEach(pl => {
@@ -226,7 +235,7 @@ connectBtn.onclick = async () => {
           const query = queryEl && queryEl.value.trim() !== ''
             ? queryEl.value.trim()
             : `${db}.json?sql=select+full_path+from+playlist_export+where+id+%3D+`;
-          const tracks = await getPlaylist(dataUrl, query, pl.id);
+          const tracks = await getPlaylist(dataUrl, query, pl.id, cf);
           const m3u = generateM3U(pl.name, tracks);
           await exportM3U(pl.name, m3u, dapUrl);
         } catch (e) {
