@@ -7,12 +7,6 @@ self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
 });
 
-// Pass-through fetch, but catch errors
-self.addEventListener('fetch', event => {
-  event.respondWith(
-    fetch(event.request).catch(() => {
-      // fallback: if request fails, just return a blank response
-      return new Response('', { status: 200, statusText: 'OK' });
-    })
-  );
-});
+// No respondWith: the browser handles requests normally, so network errors
+// reach the page and the DAP upload fallback works.
+self.addEventListener('fetch', () => {});
