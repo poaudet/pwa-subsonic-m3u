@@ -1,17 +1,22 @@
 // =========================
 // Local storage helpers
 // =========================
-function saveLocal({ serverUrl, dataUrl, db, dapUrl, user, pass, remember }) {
+function saveLocal({ serverUrl, dataUrl, db, dapUrl, user, pass, cfId, cfSecret, remember }) {
   localStorage.setItem('serverUrl', serverUrl);
   localStorage.setItem('dataUrl', dataUrl);
   localStorage.setItem('db', db);
   localStorage.setItem('dapUrl', dapUrl);
   localStorage.setItem('user', user);
+  localStorage.setItem('cfId', cfId);
   localStorage.setItem('remember', remember ? '1' : '0');
 
-  // Only keep the password if the user explicitly asked for it
-  if (remember) localStorage.setItem('pass', pass);
-  else localStorage.removeItem('pass');
+  if (remember) {
+    localStorage.setItem('pass', pass);
+    localStorage.setItem('cfSecret', cfSecret);
+  } else {
+    localStorage.removeItem('pass');
+    localStorage.removeItem('cfSecret');
+  }
 }
 
 function loadLocal() {
@@ -22,6 +27,8 @@ function loadLocal() {
     dapUrl:    localStorage.getItem('dapUrl'),
     user:      localStorage.getItem('user'),
     pass:      localStorage.getItem('pass'),
+    cfId:      localStorage.getItem('cfId'),
+    cfSecret:  localStorage.getItem('cfSecret'),
     remember:  localStorage.getItem('remember') === '1'
   };
 }
@@ -67,10 +74,16 @@ function authParams(user, pass) {
   });
 }
 
+function cfHeaders(id, secret) {
+  return id && secret
+    ? { 'CF-Access-Client-Id': id, 'CF-Access-Client-Secret': secret }
+    : {};
+}
+
 async function getPlaylists(serverUrl, user, pass) {
   const base = serverUrl.replace(/\/+$/, '');
   const url = `${base}/rest/getPlaylists.view?${authParams(user, pass)}`;
-  const res = await safeFetch(url, {}, 'Subsonic server');
+  const res = await safeFetch(url, { headers: cf }, 'Subsonic server');
 
   if (!res.ok) throw new Error(`Subsonic server: HTTP ${res.status}`);
 
@@ -91,7 +104,7 @@ async function getPlaylists(serverUrl, user, pass) {
 async function getPlaylist(dataUrl, query, pid) {
   const base = dataUrl.replace(/\/+$/, '');
   const url = `${base}/${query}"${encodeURIComponent(pid)}"`;
-  const res = await safeFetch(url, {}, 'Datasette');
+  const res = await safeFetch(url, { headers: cf }, 'Datasette');
 
   if (!res.ok) throw new Error(`Datasette: HTTP ${res.status}`);
 
