@@ -185,10 +185,6 @@ const list          = document.getElementById('playlists');
 const cfIdInput     = document.getElementById('cfId');
 const cfSecretInput = document.getElementById('cfSecret');
 
-// restore
-if (persisted.cfId)     cfIdInput.value     = persisted.cfId;
-if (persisted.cfSecret) cfSecretInput.value = persisted.cfSecret;
-
 // Restore persisted values
 const persisted = loadLocal();
 if (persisted.serverUrl) serverInput.value = persisted.serverUrl;
@@ -197,6 +193,8 @@ if (persisted.db)        dbInput.value     = persisted.db;
 if (persisted.dapUrl)    dapInput.value    = persisted.dapUrl;
 if (persisted.user)      userInput.value   = persisted.user;
 if (persisted.pass)      passInput.value   = persisted.pass;
+if (persisted.cfId)     cfIdInput.value     = persisted.cfId;
+if (persisted.cfSecret) cfSecretInput.value = persisted.cfSecret;
 rememberInput.checked = persisted.remember;
 
 connectBtn.onclick = async () => {
