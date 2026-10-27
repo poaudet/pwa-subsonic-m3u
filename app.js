@@ -1,43 +1,101 @@
 // =========================
 // Local storage helpers
 // =========================
-function saveLocal(serverUrl, dataUrl, db, dapUrl) {
-  // Store each value under a distinct key in localStorage
+function saveLocal({ serverUrl, dataUrl, db, dapUrl, user, pass, remember }) {
   localStorage.setItem('serverUrl', serverUrl);
   localStorage.setItem('dataUrl', dataUrl);
   localStorage.setItem('db', db);
   localStorage.setItem('dapUrl', dapUrl);
+  localStorage.setItem('user', user);
+  localStorage.setItem('remember', remember ? '1' : '0');
+
+  // Only keep the password if the user explicitly asked for it
+  if (remember) localStorage.setItem('pass', pass);
+  else localStorage.removeItem('pass');
 }
 
 function loadLocal() {
-  // Retrieve the stored values; missing keys resolve to null
   return {
     serverUrl: localStorage.getItem('serverUrl'),
     dataUrl:   localStorage.getItem('dataUrl'),
     db:        localStorage.getItem('db'),
-    dapUrl:    localStorage.getItem('dapUrl')
+    dapUrl:    localStorage.getItem('dapUrl'),
+    user:      localStorage.getItem('user'),
+    pass:      localStorage.getItem('pass'),
+    remember:  localStorage.getItem('remember') === '1'
   };
 }
 
 // =========================
-// API calls to /rest/
-// Nginx will inject Subsonic u/p and f=json
+// fetch wrapper: timeout + readable errors
 // =========================
-async function getPlaylists(serverUrl) {
-  const url = `${serverUrl}/rest/getPlaylists.view`;
-  const res = await fetch(url);
-
-  if (!res.ok) throw new Error('Failed to fetch playlists');
-  const json = await res.json();
-  return json?.['subsonic-response']?.playlists.playlist || [];
+async function safeFetch(url, options = {}, label = 'Request', timeoutMs = 10000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: ctrl.signal });
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`${label}: timed out after ${timeoutMs / 1000}s`);
+    }
+    // fetch only throws TypeError for network, CORS and mixed-content failures
+    throw new Error(`${label}: could not connect (server unreachable, CORS, or http/https mixed content)`);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
-async function getPlaylist(dataUrl, query, pid) {
-  const url = `${dataUrl}/${query}"${encodeURIComponent(pid)}"`;
-  const res = await fetch(url);
+async function parseJson(res, label) {
+  try {
+    return await res.json();
+  } catch {
+    throw new Error(`${label}: server did not return valid JSON`);
+  }
+}
 
-  if (!res.ok) throw new Error('Failed to fetch playlist details');
-  const json = await res.json();
+// =========================
+// Subsonic API
+// Credentials come from the form; nginx only proxies.
+// =========================
+function authParams(user, pass) {
+  return new URLSearchParams({
+    u: user,
+    p: pass,
+    v: '1.16.1',
+    c: 'pwa-subsonic-m3u',
+    f: 'json'
+  });
+}
+
+async function getPlaylists(serverUrl, user, pass) {
+  const base = serverUrl.replace(/\/+$/, '');
+  const url = `${base}/rest/getPlaylists.view?${authParams(user, pass)}`;
+  const res = await safeFetch(url, {}, 'Subsonic server');
+
+  if (!res.ok) throw new Error(`Subsonic server: HTTP ${res.status}`);
+
+  const json = await parseJson(res, 'Subsonic server');
+  const sr = json?.['subsonic-response'];
+  if (!sr) throw new Error('Subsonic server: unexpected response');
+
+  // Subsonic reports auth/API errors with HTTP 200 + status "failed"
+  if (sr.status !== 'ok') {
+    throw new Error(sr.error?.message || 'Subsonic request failed');
+  }
+  return sr.playlists?.playlist || [];
+}
+
+// =========================
+// Datasette: track paths for a playlist
+// =========================
+async function getPlaylist(dataUrl, query, pid) {
+  const base = dataUrl.replace(/\/+$/, '');
+  const url = `${base}/${query}"${encodeURIComponent(pid)}"`;
+  const res = await safeFetch(url, {}, 'Datasette');
+
+  if (!res.ok) throw new Error(`Datasette: HTTP ${res.status}`);
+
+  const json = await parseJson(res, 'Datasette');
   return (json.rows || []).map(r => r[0]);
 }
 
@@ -88,58 +146,60 @@ async function uploadToDAP(dapUrl, name, content) {
     `${name}.m3u`
   );
 
-  let res;
-  try {
-    res = await fetch(dapUrl, {
-      method: 'POST',
-      body: form,
-      mode: 'cors'
-    });
-  } catch (err) {
-    throw new Error('DAP upload blocked by browser');
-  }
+  const res = await safeFetch(
+    dapUrl,
+    { method: 'POST', body: form, mode: 'cors' },
+    'DAP upload',
+    15000
+  );
 
-  if (res.status !== 200) {
-    throw new Error(`DAP upload failed: ${res.status}`);
-  }
+  if (!res.ok) throw new Error(`DAP upload: HTTP ${res.status}`);
 }
 
 // =========================
 // UI wiring
 // =========================
-const serverInput = document.getElementById('serverUrl');
-const dataInput   = document.getElementById('dataUrl');
-const dbInput     = document.getElementById('db');
-const queryEl     = document.getElementById('query');
-const dapInput    = document.getElementById('dapUrl');
-const connectBtn  = document.getElementById('connect');
-const list        = document.getElementById('playlists');
+const serverInput   = document.getElementById('serverUrl');
+const dataInput     = document.getElementById('dataUrl');
+const dbInput       = document.getElementById('db');
+const queryEl       = document.getElementById('query');
+const dapInput      = document.getElementById('dapUrl');
+const userInput     = document.getElementById('user');
+const passInput     = document.getElementById('pass');
+const rememberInput = document.getElementById('remember');
+const connectBtn    = document.getElementById('connect');
+const list          = document.getElementById('playlists');
 
-// Restore persisted values (now from localStorage)
+// Restore persisted values
 const persisted = loadLocal();
 if (persisted.serverUrl) serverInput.value = persisted.serverUrl;
 if (persisted.dataUrl)   dataInput.value   = persisted.dataUrl;
 if (persisted.db)        dbInput.value     = persisted.db;
 if (persisted.dapUrl)    dapInput.value    = persisted.dapUrl;
+if (persisted.user)      userInput.value   = persisted.user;
+if (persisted.pass)      passInput.value   = persisted.pass;
+rememberInput.checked = persisted.remember;
 
 connectBtn.onclick = async () => {
   const serverUrl = serverInput.value.trim();
   const dataUrl   = dataInput.value.trim();
-  const db        = dbInput.value.trim() || "navidrome";
+  const db        = dbInput.value.trim() || 'navidrome';
   const dapUrl    = dapInput.value.trim();
+  const user      = userInput.value.trim();
+  const pass      = passInput.value; // don't trim passwords
+  const remember  = rememberInput.checked;
 
-  if (!serverUrl || !dataUrl || !db) {
-    alert('Server URL, Database URL and Database are required');
+  if (!serverUrl || !dataUrl || !db || !user || !pass) {
+    alert('Server URL, Datasette URL, Database, Username and Password are required');
     return;
   }
 
-  // Persist the current session for future page loads
-  saveLocal(serverUrl, dataUrl, db, dapUrl);
+  saveLocal({ serverUrl, dataUrl, db, dapUrl, user, pass, remember });
 
   list.innerHTML = 'Loading…';
 
   try {
-    const playlists = await getPlaylists(serverUrl);
+    const playlists = await getPlaylists(serverUrl, user, pass);
     list.innerHTML = '';
 
     playlists.forEach(pl => {
@@ -150,7 +210,7 @@ connectBtn.onclick = async () => {
         try {
           li.textContent = `Generating ${pl.name}…`;
           const dapUrl = dapInput.value.trim();
-          const query = queryEl && queryEl.value.trim() !== ""
+          const query = queryEl && queryEl.value.trim() !== ''
             ? queryEl.value.trim()
             : `${db}.json?sql=select+full_path+from+playlist_export+where+id+%3D+`;
           const tracks = await getPlaylist(dataUrl, query, pl.id);
