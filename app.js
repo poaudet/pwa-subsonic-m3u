@@ -1,17 +1,15 @@
 // =========================
 // Local storage helpers
 // =========================
-function saveLocal({ serverUrl, dataUrl, db, dapUrl, user, pass, cfId, cfSecret, remember }) {
+function saveLocal({ serverUrl, dataUrl, db, dapUrl, cfId, cfSecret, remember }) {
   localStorage.setItem('serverUrl', serverUrl);
   localStorage.setItem('dataUrl', dataUrl);
   localStorage.setItem('db', db);
   localStorage.setItem('dapUrl', dapUrl);
-  localStorage.setItem('user', user);
   localStorage.setItem('cfId', cfId);
   localStorage.setItem('remember', remember ? '1' : '0');
 
   if (remember) {
-    localStorage.setItem('pass', pass);
     localStorage.setItem('cfSecret', cfSecret);
   } else {
     localStorage.removeItem('pass');
@@ -25,8 +23,6 @@ function loadLocal() {
     dataUrl:   localStorage.getItem('dataUrl'),
     db:        localStorage.getItem('db'),
     dapUrl:    localStorage.getItem('dapUrl'),
-    user:      localStorage.getItem('user'),
-    pass:      localStorage.getItem('pass'),
     cfId:      localStorage.getItem('cfId'),
     cfSecret:  localStorage.getItem('cfSecret'),
     remember:  localStorage.getItem('remember') === '1'
@@ -64,15 +60,6 @@ async function parseJson(res, label) {
 // Subsonic API
 // Credentials come from the form; nginx only proxies.
 // =========================
-function authParams(user, pass) {
-  return new URLSearchParams({
-    u: user,
-    p: pass,
-    v: '1.16.1',
-    c: 'pwa-subsonic-m3u',
-    f: 'json'
-  });
-}
 
 function cfHeaders(id, secret) {
   return id && secret
@@ -80,9 +67,9 @@ function cfHeaders(id, secret) {
     : {};
 }
 
-async function getPlaylists(serverUrl, user, pass, cf = {}) {
+async function getPlaylists(serverUrl, cf = {}) {
   const base = serverUrl.replace(/\/+$/, '');
-  const url = `${base}/rest/getPlaylists.view?${authParams(user, pass)}`;
+  const url = `${base}/rest/getPlaylists.view}`;
   const res = await safeFetch(url, { headers: cf }, 'Subsonic server');
 
   if (!res.ok) throw new Error(`Subsonic server: HTTP ${res.status}`);
@@ -177,8 +164,6 @@ const dataInput     = document.getElementById('dataUrl');
 const dbInput       = document.getElementById('db');
 const queryEl       = document.getElementById('query');
 const dapInput      = document.getElementById('dapUrl');
-const userInput     = document.getElementById('user');
-const passInput     = document.getElementById('pass');
 const rememberInput = document.getElementById('remember');
 const connectBtn    = document.getElementById('connect');
 const list          = document.getElementById('playlists');
@@ -191,8 +176,6 @@ if (persisted.serverUrl) serverInput.value = persisted.serverUrl;
 if (persisted.dataUrl)   dataInput.value   = persisted.dataUrl;
 if (persisted.db)        dbInput.value     = persisted.db;
 if (persisted.dapUrl)    dapInput.value    = persisted.dapUrl;
-if (persisted.user)      userInput.value   = persisted.user;
-if (persisted.pass)      passInput.value   = persisted.pass;
 if (persisted.cfId)     cfIdInput.value     = persisted.cfId;
 if (persisted.cfSecret) cfSecretInput.value = persisted.cfSecret;
 rememberInput.checked = persisted.remember;
@@ -202,24 +185,22 @@ connectBtn.onclick = async () => {
   const dataUrl   = dataInput.value.trim();
   const db        = dbInput.value.trim() || 'navidrome';
   const dapUrl    = dapInput.value.trim();
-  const user      = userInput.value.trim();
-  const pass      = passInput.value; // don't trim passwords
   const remember  = rememberInput.checked;
   const cfId      = cfIdInput.value.trim();
   const cfSecret  = cfSecretInput.value.trim();
   const cf        = cfHeaders(cfId, cfSecret);
 
-  saveLocal({ serverUrl, dataUrl, db, dapUrl, user, pass, cfId, cfSecret, remember });
+  saveLocal({ serverUrl, dataUrl, db, dapUrl, cfId, cfSecret, remember });
 
-  if (!serverUrl || !dataUrl || !db || !user || !pass) {
-    alert('Server URL, Datasette URL, Database, Username and Password are required');
+  if (!serverUrl || !dataUrl || !db) {
+    alert('Server URL, Datasette URL and Database are required');
     return;
   }
 
   list.innerHTML = 'Loading…';
 
   try {
-    const playlists = await getPlaylists(serverUrl, user, pass, cf);
+    const playlists = await getPlaylists(serverUrl, cf);
     list.innerHTML = '';
 
     playlists.forEach(pl => {
