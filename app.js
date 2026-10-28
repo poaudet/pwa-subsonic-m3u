@@ -69,7 +69,7 @@ function cfHeaders(id, secret) {
 
 async function getPlaylists(serverUrl, cf = {}) {
   const base = serverUrl.replace(/\/+$/, '');
-  const url = `${base}/rest/getPlaylists.view}`;
+  const url = `${base}/rest/getPlaylists.view`;
   const res = await safeFetch(url, { headers: cf }, 'Subsonic server');
 
   if (!res.ok) throw new Error(`Subsonic server: HTTP ${res.status}`);
